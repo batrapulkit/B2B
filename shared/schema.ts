@@ -1,125 +1,128 @@
-import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, integer, decimal, jsonb, index } from "drizzle-orm/pg-core";
-import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-export const sessions = pgTable(
-  "sessions",
-  {
-    sid: varchar("sid").primaryKey(),
-    sess: jsonb("sess").notNull(),
-    expire: timestamp("expire").notNull(),
-  },
-  (table) => [index("IDX_session_expire").on(table.expire)]
-);
-
-export const users = pgTable("users", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  email: varchar("email").unique(),
-  firstName: varchar("first_name"),
-  lastName: varchar("last_name"),
-  profileImageUrl: varchar("profile_image_url"),
-  role: text("role").notNull().default("agent"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
+// User types
+export const upsertUserSchema = z.object({
+  id: z.string(),
+  email: z.string().email().nullable().optional(),
+  firstName: z.string().nullable().optional(),
+  lastName: z.string().nullable().optional(),
+  profileImageUrl: z.string().nullable().optional(),
+  role: z.string().optional(),
 });
 
-export const clients = pgTable("clients", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  name: text("name").notNull(),
-  email: text("email").notNull(),
-  phone: text("phone"),
-  company: text("company"),
-  status: text("status").notNull().default("lead"),
-  notes: text("notes"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
-
-export const itineraries = pgTable("itineraries", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  clientId: varchar("client_id").notNull().references(() => clients.id),
-  destination: text("destination").notNull(),
-  startDate: timestamp("start_date").notNull(),
-  endDate: timestamp("end_date").notNull(),
-  travelers: integer("travelers").notNull().default(1),
-  budget: decimal("budget", { precision: 10, scale: 2 }),
-  status: text("status").notNull().default("draft"),
-  content: text("content"),
-  imageUrl: text("image_url"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
-
-export const invoices = pgTable("invoices", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  invoiceNumber: text("invoice_number").notNull().unique(),
-  clientId: varchar("client_id").notNull().references(() => clients.id),
-  itineraryId: varchar("itinerary_id").references(() => itineraries.id),
-  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
-  status: text("status").notNull().default("pending"),
-  dueDate: timestamp("due_date").notNull(),
-  paidAt: timestamp("paid_at"),
-  stripePaymentIntentId: text("stripe_payment_intent_id"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
-
-export const chatSessions = pgTable("chat_sessions", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull().references(() => users.id),
-  clientId: varchar("client_id").references(() => clients.id),
-  messages: text("messages").notNull().default("[]"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
-
-export const upsertUserSchema = createInsertSchema(users).omit({
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertClientSchema = createInsertSchema(clients).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertItinerarySchema = createInsertSchema(itineraries).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-}).extend({
-  startDate: z.string().or(z.date()),
-  endDate: z.string().or(z.date()),
-});
-
-export const insertInvoiceSchema = createInsertSchema(invoices).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-  paidAt: true,
-}).extend({
-  dueDate: z.string().or(z.date()),
-});
-
-export const insertChatSessionSchema = createInsertSchema(chatSessions).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
+export const userSchema = z.object({
+  id: z.string(),
+  email: z.string().nullable(),
+  firstName: z.string().nullable(),
+  lastName: z.string().nullable(),
+  profileImageUrl: z.string().nullable(),
+  role: z.string(),
+  createdAt: z.date(),
+  updatedAt: z.date(),
 });
 
 export type UpsertUser = z.infer<typeof upsertUserSchema>;
-export type User = typeof users.$inferSelect;
+export type User = z.infer<typeof userSchema>;
+
+// Client types
+export const insertClientSchema = z.object({
+  name: z.string().min(1),
+  email: z.string().email(),
+  phone: z.string().optional(),
+  company: z.string().optional(),
+  status: z.enum(["lead", "active", "inactive"]).optional(),
+  notes: z.string().optional(),
+});
+
+export const clientSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  email: z.string(),
+  phone: z.string().nullable(),
+  company: z.string().nullable(),
+  status: z.string(),
+  notes: z.string().nullable(),
+  createdAt: z.date(),
+  updatedAt: z.date(),
+});
 
 export type InsertClient = z.infer<typeof insertClientSchema>;
-export type Client = typeof clients.$inferSelect;
+export type Client = z.infer<typeof clientSchema>;
+
+// Itinerary types
+export const insertItinerarySchema = z.object({
+  clientId: z.string(),
+  destination: z.string().min(1),
+  startDate: z.string().or(z.date()),
+  endDate: z.string().or(z.date()),
+  travelers: z.number().int().positive().optional(),
+  budget: z.string().optional(),
+  status: z.enum(["draft", "confirmed", "completed"]).optional(),
+  content: z.string().optional(),
+  imageUrl: z.string().optional(),
+});
+
+export const itinerarySchema = z.object({
+  id: z.string(),
+  clientId: z.string(),
+  destination: z.string(),
+  startDate: z.date(),
+  endDate: z.date(),
+  travelers: z.number(),
+  budget: z.string().nullable(),
+  status: z.string(),
+  content: z.string().nullable(),
+  imageUrl: z.string().nullable(),
+  createdAt: z.date(),
+  updatedAt: z.date(),
+});
 
 export type InsertItinerary = z.infer<typeof insertItinerarySchema>;
-export type Itinerary = typeof itineraries.$inferSelect;
+export type Itinerary = z.infer<typeof itinerarySchema>;
+
+// Invoice types
+export const insertInvoiceSchema = z.object({
+  invoiceNumber: z.string().min(1),
+  clientId: z.string(),
+  itineraryId: z.string().optional(),
+  amount: z.string(),
+  status: z.enum(["pending", "paid", "overdue"]).optional(),
+  dueDate: z.string().or(z.date()),
+  stripePaymentIntentId: z.string().optional(),
+});
+
+export const invoiceSchema = z.object({
+  id: z.string(),
+  invoiceNumber: z.string(),
+  clientId: z.string(),
+  itineraryId: z.string().nullable(),
+  amount: z.string(),
+  status: z.string(),
+  dueDate: z.date(),
+  paidAt: z.date().nullable(),
+  stripePaymentIntentId: z.string().nullable(),
+  createdAt: z.date(),
+  updatedAt: z.date(),
+});
 
 export type InsertInvoice = z.infer<typeof insertInvoiceSchema>;
-export type Invoice = typeof invoices.$inferSelect;
+export type Invoice = z.infer<typeof invoiceSchema>;
+
+// Chat Session types
+export const insertChatSessionSchema = z.object({
+  userId: z.string(),
+  clientId: z.string().optional(),
+  messages: z.string().optional(),
+});
+
+export const chatSessionSchema = z.object({
+  id: z.string(),
+  userId: z.string(),
+  clientId: z.string().nullable(),
+  messages: z.string(),
+  createdAt: z.date(),
+  updatedAt: z.date(),
+});
 
 export type InsertChatSession = z.infer<typeof insertChatSessionSchema>;
-export type ChatSession = typeof chatSessions.$inferSelect;
+export type ChatSession = z.infer<typeof chatSessionSchema>;
