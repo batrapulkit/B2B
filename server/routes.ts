@@ -1,32 +1,51 @@
 import type { Express } from "express";
+import { getAuth } from "@clerk/express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { setupAuth, isAuthenticated, requireRole } from "./replitAuth";
 import { insertClientSchema, insertItinerarySchema, insertInvoiceSchema } from "@shared/schema";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { requireAuth, requireRole } from "./clerkAuth"; // ✅ Clerk middleware
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  await setupAuth(app);
+  // ✅ Clerk middleware is initialized globally in index.ts
+  // No setupAuth() needed anymore
 
-  // Auth routes
-  app.get("/api/auth/user", isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-      res.json(user);
-    } catch (error) {
-      console.error("Error fetching user:", error);
-      res.status(500).json({ message: "Failed to fetch user" });
-    }
-  });
+  // ---------------------------------------------------------------------
+  // AUTH
+  // ---------------------------------------------------------------------
 
-  // Client routes (Admin/Agent only)
-  app.get("/api/clients", isAuthenticated, requireRole("admin", "agent"), async (req, res) => {
+app.get("/api/auth/user", requireAuth, async (req: any, res) => {
+  try {
+    const { userId } = getAuth(req);
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+    // Directly fetch Clerk user info
+    const response = await fetch(`https://api.clerk.com/v1/users/${userId}`, {
+      headers: {
+        Authorization: `Bearer ${process.env.CLERK_SECRET_KEY}`,
+      },
+    });
+
+    const user = await response.json();
+    res.json({
+      id: user.id,
+      email: user.email_addresses?.[0]?.email_address,
+      firstName: user.first_name,
+      lastName: user.last_name,
+    });
+  } catch (error) {
+    console.error("Error fetching Clerk user:", error);
+    res.status(500).json({ message: "Failed to fetch user" });
+  }
+});
+
+
+  // ---------------------------------------------------------------------
+  // CLIENT ROUTES
+  // ---------------------------------------------------------------------
+  app.get("/api/clients", requireAuth, requireRole("admin", "agent"), async (_req, res) => {
     try {
       const clients = await storage.getAllClients();
       res.json(clients);
@@ -36,12 +55,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/clients/:id", isAuthenticated, requireRole("admin", "agent"), async (req, res) => {
+  app.get("/api/clients/:id", requireAuth, requireRole("admin", "agent"), async (req, res) => {
     try {
       const client = await storage.getClient(req.params.id);
-      if (!client) {
-        return res.status(404).json({ message: "Client not found" });
-      }
+      if (!client) return res.status(404).json({ message: "Client not found" });
       res.json(client);
     } catch (error) {
       console.error("Error fetching client:", error);
@@ -49,7 +66,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/clients", isAuthenticated, requireRole("admin", "agent"), async (req, res) => {
+  app.post("/api/clients", requireAuth, requireRole("admin", "agent"), async (req, res) => {
     try {
       const validatedData = insertClientSchema.parse(req.body);
       const client = await storage.createClient(validatedData);
@@ -60,14 +77,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/clients/:id", isAuthenticated, requireRole("admin", "agent"), async (req, res) => {
+  app.patch("/api/clients/:id", requireAuth, requireRole("admin", "agent"), async (req, res) => {
     try {
       const updateSchema = insertClientSchema.partial();
-      const validatedData = updateSchema.parse(req.body);
-      const client = await storage.updateClient(req.params.id, validatedData);
-      if (!client) {
-        return res.status(404).json({ message: "Client not found" });
-      }
+      const validated = updateSchema.parse(req.body);
+      const client = await storage.updateClient(req.params.id, validated);
+      if (!client) return res.status(404).json({ message: "Client not found" });
       res.json(client);
     } catch (error) {
       console.error("Error updating client:", error);
@@ -75,12 +90,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/clients/:id", isAuthenticated, requireRole("admin", "agent"), async (req, res) => {
+  app.delete("/api/clients/:id", requireAuth, requireRole("admin", "agent"), async (req, res) => {
     try {
       const success = await storage.deleteClient(req.params.id);
-      if (!success) {
-        return res.status(404).json({ message: "Client not found" });
-      }
+      if (!success) return res.status(404).json({ message: "Client not found" });
       res.status(204).send();
     } catch (error) {
       console.error("Error deleting client:", error);
@@ -88,8 +101,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Itinerary routes (Admin/Agent only)
-  app.get("/api/itineraries", isAuthenticated, requireRole("admin", "agent"), async (req, res) => {
+  // ---------------------------------------------------------------------
+  // ITINERARY ROUTES
+  // ---------------------------------------------------------------------
+  app.get("/api/itineraries", requireAuth, requireRole("admin", "agent"), async (_req, res) => {
     try {
       const itineraries = await storage.getAllItineraries();
       res.json(itineraries);
@@ -99,12 +114,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/itineraries/:id", isAuthenticated, requireRole("admin", "agent"), async (req, res) => {
+  app.get("/api/itineraries/:id", requireAuth, requireRole("admin", "agent"), async (req, res) => {
     try {
       const itinerary = await storage.getItinerary(req.params.id);
-      if (!itinerary) {
-        return res.status(404).json({ message: "Itinerary not found" });
-      }
+      if (!itinerary) return res.status(404).json({ message: "Itinerary not found" });
       res.json(itinerary);
     } catch (error) {
       console.error("Error fetching itinerary:", error);
@@ -112,7 +125,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/itineraries", isAuthenticated, requireRole("admin", "agent"), async (req, res) => {
+  app.post("/api/itineraries", requireAuth, requireRole("admin", "agent"), async (req, res) => {
     try {
       const validatedData = insertItinerarySchema.parse(req.body);
       const itinerary = await storage.createItinerary(validatedData);
@@ -123,14 +136,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/itineraries/:id", isAuthenticated, requireRole("admin", "agent"), async (req, res) => {
+  app.patch("/api/itineraries/:id", requireAuth, requireRole("admin", "agent"), async (req, res) => {
     try {
       const updateSchema = insertItinerarySchema.partial();
-      const validatedData = updateSchema.parse(req.body);
-      const itinerary = await storage.updateItinerary(req.params.id, validatedData);
-      if (!itinerary) {
-        return res.status(404).json({ message: "Itinerary not found" });
-      }
+      const validated = updateSchema.parse(req.body);
+      const itinerary = await storage.updateItinerary(req.params.id, validated);
+      if (!itinerary) return res.status(404).json({ message: "Itinerary not found" });
       res.json(itinerary);
     } catch (error) {
       console.error("Error updating itinerary:", error);
@@ -138,12 +149,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/itineraries/:id", isAuthenticated, requireRole("admin", "agent"), async (req, res) => {
+  app.delete("/api/itineraries/:id", requireAuth, requireRole("admin", "agent"), async (req, res) => {
     try {
       const success = await storage.deleteItinerary(req.params.id);
-      if (!success) {
-        return res.status(404).json({ message: "Itinerary not found" });
-      }
+      if (!success) return res.status(404).json({ message: "Itinerary not found" });
       res.status(204).send();
     } catch (error) {
       console.error("Error deleting itinerary:", error);
@@ -151,8 +160,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Invoice routes (Admin/Agent only)
-  app.get("/api/invoices", isAuthenticated, requireRole("admin", "agent"), async (req, res) => {
+  // ---------------------------------------------------------------------
+  // INVOICE ROUTES
+  // ---------------------------------------------------------------------
+  app.get("/api/invoices", requireAuth, requireRole("admin", "agent"), async (_req, res) => {
     try {
       const invoices = await storage.getAllInvoices();
       res.json(invoices);
@@ -162,12 +173,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/invoices/:id", isAuthenticated, requireRole("admin", "agent"), async (req, res) => {
+  app.get("/api/invoices/:id", requireAuth, requireRole("admin", "agent"), async (req, res) => {
     try {
       const invoice = await storage.getInvoice(req.params.id);
-      if (!invoice) {
-        return res.status(404).json({ message: "Invoice not found" });
-      }
+      if (!invoice) return res.status(404).json({ message: "Invoice not found" });
       res.json(invoice);
     } catch (error) {
       console.error("Error fetching invoice:", error);
@@ -175,7 +184,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/invoices", isAuthenticated, requireRole("admin", "agent"), async (req, res) => {
+  app.post("/api/invoices", requireAuth, requireRole("admin", "agent"), async (req, res) => {
     try {
       const validatedData = insertInvoiceSchema.parse(req.body);
       const invoice = await storage.createInvoice(validatedData);
@@ -186,14 +195,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/invoices/:id", isAuthenticated, requireRole("admin", "agent"), async (req, res) => {
+  app.patch("/api/invoices/:id", requireAuth, requireRole("admin", "agent"), async (req, res) => {
     try {
       const updateSchema = insertInvoiceSchema.partial();
-      const validatedData = updateSchema.parse(req.body);
-      const invoice = await storage.updateInvoice(req.params.id, validatedData);
-      if (!invoice) {
-        return res.status(404).json({ message: "Invoice not found" });
-      }
+      const validated = updateSchema.parse(req.body);
+      const invoice = await storage.updateInvoice(req.params.id, validated);
+      if (!invoice) return res.status(404).json({ message: "Invoice not found" });
       res.json(invoice);
     } catch (error) {
       console.error("Error updating invoice:", error);
@@ -201,37 +208,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // AI Itinerary Generation (Admin/Agent only)
-  app.post("/api/llm/generate-itinerary", isAuthenticated, requireRole("admin", "agent"), async (req, res) => {
+  // ---------------------------------------------------------------------
+  // AI ITINERARY GENERATION
+  // ---------------------------------------------------------------------
+  app.post("/api/llm/generate-itinerary", requireAuth, requireRole("admin", "agent"), async (req, res) => {
     try {
       const { messages, destination, budget, duration, travelers, preferences } = req.body;
 
       const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-      const prompt = `You are an expert travel planner. Create a detailed travel itinerary based on the following information:
-
+      const prompt = `
+You are an expert travel planner. Create a detailed itinerary based on:
 Destination: ${destination}
 Budget: ${budget}
 Duration: ${duration}
-Number of travelers: ${travelers}
-Preferences: ${preferences || "None specified"}
+Travelers: ${travelers}
+Preferences: ${preferences || "None"}
 
-${messages && messages.length > 0 ? `Previous conversation:\n${messages.map((m: any) => `${m.role}: ${m.content}`).join('\n')}\n\n` : ''}
+${messages && messages.length ? `Conversation:\n${messages.map((m: any) => `${m.role}: ${m.content}`).join('\n')}` : ''}
 
-Please provide a comprehensive day-by-day itinerary that includes:
-1. Daily activities and attractions
-2. Recommended restaurants and dining options
-3. Accommodation suggestions
-4. Transportation tips
+Provide:
+1. Daily activities
+2. Dining suggestions
+3. Stay options
+4. Local transport advice
 5. Budget breakdown
-6. Packing recommendations
-7. Local tips and cultural insights
-
-Format the response in a clear, organized manner with headings and bullet points.`;
+6. Local insights
+`;
 
       const result = await model.generateContent(prompt);
-      const response = result.response;
-      const text = response.text();
+      const text = result.response.text();
 
       res.json({
         itinerary: text,
@@ -246,10 +252,12 @@ Format the response in a clear, organized manner with headings and bullet points
     }
   });
 
-  // Chat sessions (Admin/Agent only)
-  app.get("/api/chat-sessions", isAuthenticated, requireRole("admin", "agent"), async (req: any, res) => {
+  // ---------------------------------------------------------------------
+  // CHAT SESSIONS
+  // ---------------------------------------------------------------------
+  app.get("/api/chat-sessions", requireAuth, requireRole("admin", "agent"), async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.auth.userId;
       const sessions = await storage.getChatSessionsByUser(userId);
       res.json(sessions);
     } catch (error) {
@@ -258,9 +266,9 @@ Format the response in a clear, organized manner with headings and bullet points
     }
   });
 
-  app.post("/api/chat-sessions", isAuthenticated, requireRole("admin", "agent"), async (req: any, res) => {
+  app.post("/api/chat-sessions", requireAuth, requireRole("admin", "agent"), async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.auth.userId;
       const session = await storage.createChatSession({
         userId,
         clientId: req.body.clientId || null,
@@ -273,12 +281,10 @@ Format the response in a clear, organized manner with headings and bullet points
     }
   });
 
-  app.patch("/api/chat-sessions/:id", isAuthenticated, requireRole("admin", "agent"), async (req, res) => {
+  app.patch("/api/chat-sessions/:id", requireAuth, requireRole("admin", "agent"), async (req, res) => {
     try {
       const session = await storage.updateChatSession(req.params.id, req.body);
-      if (!session) {
-        return res.status(404).json({ message: "Chat session not found" });
-      }
+      if (!session) return res.status(404).json({ message: "Chat session not found" });
       res.json(session);
     } catch (error) {
       console.error("Error updating chat session:", error);
@@ -286,14 +292,13 @@ Format the response in a clear, organized manner with headings and bullet points
     }
   });
 
-  // Payment routes (Admin/Agent only)
-  app.post("/api/payments/create-intent", isAuthenticated, requireRole("admin", "agent"), async (req, res) => {
+  // ---------------------------------------------------------------------
+  // PAYMENTS
+  // ---------------------------------------------------------------------
+  app.post("/api/payments/create-intent", requireAuth, requireRole("admin", "agent"), async (req, res) => {
     try {
       const { amount } = req.body;
-      
-      if (!amount || amount <= 0) {
-        return res.status(400).json({ message: "Valid amount is required" });
-      }
+      if (!amount || amount <= 0) return res.status(400).json({ message: "Valid amount required" });
 
       const { createPaymentIntent } = await import("./stripe");
       const paymentIntent = await createPaymentIntent(amount);
@@ -308,38 +313,34 @@ Format the response in a clear, organized manner with headings and bullet points
     }
   });
 
-  app.post("/api/invoices/:id/pay", isAuthenticated, requireRole("admin", "agent"), async (req, res) => {
+  app.post("/api/invoices/:id/pay", requireAuth, requireRole("admin", "agent"), async (req, res) => {
     try {
       const invoice = await storage.getInvoice(req.params.id);
-      if (!invoice) {
-        return res.status(404).json({ message: "Invoice not found" });
-      }
+      if (!invoice) return res.status(404).json({ message: "Invoice not found" });
 
       const { createPaymentIntent } = await import("./stripe");
       const paymentIntent = await createPaymentIntent(parseFloat(invoice.amount));
 
-      await storage.updateInvoice(req.params.id, {
-        stripePaymentIntentId: paymentIntent.id,
-      });
+      await storage.updateInvoice(req.params.id, { stripePaymentIntentId: paymentIntent.id });
 
       res.json({
         clientSecret: paymentIntent.client_secret,
         paymentIntentId: paymentIntent.id,
       });
     } catch (error) {
-      console.error("Error processing invoice payment:", error);
+      console.error("Error processing payment:", error);
       res.status(500).json({ message: "Failed to process payment" });
     }
   });
 
+  // Stripe webhook (no auth)
   app.post("/api/payments/webhook", async (req, res) => {
     try {
       const event = req.body;
-
       if (event.type === "payment_intent.succeeded") {
         const paymentIntent = event.data.object;
         const invoices = await storage.getAllInvoices();
-        const invoice = invoices.find((inv) => inv.stripePaymentIntentId === paymentIntent.id);
+        const invoice = invoices.find(inv => inv.stripePaymentIntentId === paymentIntent.id);
 
         if (invoice) {
           await storage.updateInvoice(invoice.id, {
@@ -348,7 +349,6 @@ Format the response in a clear, organized manner with headings and bullet points
           } as any);
         }
       }
-
       res.json({ received: true });
     } catch (error) {
       console.error("Error handling webhook:", error);
@@ -356,23 +356,24 @@ Format the response in a clear, organized manner with headings and bullet points
     }
   });
 
-  // Analytics endpoints (Admin/Agent only)
-  app.get("/api/analytics/overview", isAuthenticated, requireRole("admin", "agent"), async (req, res) => {
+  // ---------------------------------------------------------------------
+  // ANALYTICS
+  // ---------------------------------------------------------------------
+  app.get("/api/analytics/overview", requireAuth, requireRole("admin", "agent"), async (_req, res) => {
     try {
       const clients = await storage.getAllClients();
       const itineraries = await storage.getAllItineraries();
       const invoices = await storage.getAllInvoices();
 
       const totalRevenue = invoices
-        .filter((inv) => inv.status === "paid")
+        .filter(inv => inv.status === "paid")
         .reduce((sum, inv) => sum + parseFloat(inv.amount || "0"), 0);
 
-      const activeClients = clients.filter((c) => c.status === "active").length;
+      const activeClients = clients.filter(c => c.status === "active").length;
       const totalTrips = itineraries.length;
-
-      const paidInvoices = invoices.filter((inv) => inv.status === "paid").length;
-      const conversionRate = invoices.length > 0 
-        ? ((paidInvoices / invoices.length) * 100).toFixed(1) 
+      const paidInvoices = invoices.filter(inv => inv.status === "paid").length;
+      const conversionRate = invoices.length
+        ? ((paidInvoices / invoices.length) * 100).toFixed(1)
         : "0";
 
       res.json({
@@ -387,6 +388,9 @@ Format the response in a clear, organized manner with headings and bullet points
     }
   });
 
+  // ---------------------------------------------------------------------
+  // RETURN SERVER
+  // ---------------------------------------------------------------------
   const httpServer = createServer(app);
   return httpServer;
 }

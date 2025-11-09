@@ -1,15 +1,13 @@
-import { useQuery } from "@tanstack/react-query";
-import type { User } from "@shared/schema";
+import { useUser } from "@clerk/clerk-react";
 
 export function useAuth() {
-  const { data: user, isLoading } = useQuery<User>({
-    queryKey: ["/api/auth/user"],
-    retry: false,
-  });
+  const { isLoaded, isSignedIn, user } = useUser();
+
+  console.log("Clerk Auth:", { isLoaded, isSignedIn, user });
 
   return {
     user,
-    isLoading,
-    isAuthenticated: !!user,
+    isLoading: !isLoaded,
+    isAuthenticated: isSignedIn,
   };
 }
