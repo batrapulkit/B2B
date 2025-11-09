@@ -49,7 +49,7 @@ function MainLayout() {
               {user && (
                 <div className="text-sm">
                   <span className="text-muted-foreground">Welcome, </span>
-                  <span className="font-medium">{(user as any).firstName || (user as any).email}</span>
+                  <span className="font-medium">{String((user as any).firstName || (user as any).email || 'User')}</span>
                 </div>
               )}
               <Button
