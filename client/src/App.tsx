@@ -5,17 +5,18 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
-import { LoginPage } from "@/components/LoginPage";
 import { useAuth } from "@/hooks/useAuth";
 import Dashboard from "@/pages/Dashboard";
 import CRMPage from "@/pages/CRMPage";
 import InvoicesPage from "@/pages/InvoicesPage";
 import AIPlannerPage from "@/pages/AIPlannerPage";
+import SignIn from "@/pages/SignIn";
+import SignUp from "@/pages/SignUp";
 import NotFound from "@/pages/not-found";
 import { Button } from "@/components/ui/button";
 import { LogOut } from "lucide-react";
 
-function Router() {
+function AuthenticatedRouter() {
   return (
     <Switch>
       <Route path="/" component={Dashboard} />
@@ -23,6 +24,17 @@ function Router() {
       <Route path="/clients" component={CRMPage} />
       <Route path="/invoices" component={InvoicesPage} />
       <Route component={NotFound} />
+    </Switch>
+  );
+}
+
+function UnauthenticatedRouter() {
+  return (
+    <Switch>
+      <Route path="/" component={SignIn} />
+      <Route path="/signin" component={SignIn} />
+      <Route path="/signup" component={SignUp} />
+      <Route component={SignIn} />
     </Switch>
   );
 }
@@ -64,7 +76,7 @@ function MainLayout() {
             </div>
           </header>
           <main className="flex-1 overflow-auto p-8 bg-background">
-            <Router />
+            <AuthenticatedRouter />
           </main>
         </div>
       </div>
@@ -88,7 +100,7 @@ function AuthenticatedApp() {
 
   return (
     <TooltipProvider>
-      {isAuthenticated ? <MainLayout /> : <LoginPage />}
+      {isAuthenticated ? <MainLayout /> : <UnauthenticatedRouter />}
       <Toaster />
     </TooltipProvider>
   );
