@@ -344,8 +344,8 @@ Format the response in a clear, organized manner with headings and bullet points
         if (invoice) {
           await storage.updateInvoice(invoice.id, {
             status: "paid",
-            paidAt: new Date().toISOString(),
-          });
+            paidAt: new Date(),
+          } as any);
         }
       }
 

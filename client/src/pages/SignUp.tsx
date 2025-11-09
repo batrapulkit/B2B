@@ -20,7 +20,11 @@ export default function SignUp() {
               Triponic
             </span>
           </div>
-          <Button variant="ghost" onClick={() => window.location.href = "/signin"}>
+          <Button 
+            variant="ghost" 
+            onClick={() => window.location.href = "/signin"}
+            data-testid="button-goto-signin"
+          >
             Already have an account? Sign In
           </Button>
         </div>
@@ -100,6 +104,7 @@ export default function SignUp() {
                 onClick={handleSignUp}
                 className="w-full h-12 text-lg bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
                 size="lg"
+                data-testid="button-signup"
               >
                 Get Started Free
               </Button>
