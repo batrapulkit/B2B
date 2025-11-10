@@ -1,8 +1,8 @@
 import { useAuth } from "@clerk/clerk-react";
 
 /**
- * Hook that provides a Clerk-authenticated fetch wrapper
- * Automatically attaches your Clerk JWT to all requests.
+ * A small helper hook to make authenticated API requests
+ * It automatically attaches the Clerk token from the current session.
  */
 export function useClerkFetch() {
   const { getToken, isLoaded } = useAuth();
@@ -11,7 +11,7 @@ export function useClerkFetch() {
     if (!isLoaded) throw new Error("Clerk not loaded yet");
 
     const token = await getToken();
-    if (!token) throw new Error("No Clerk token found");
+    if (!token) throw new Error("No Clerk token available");
 
     const headers = {
       ...(options.headers || {}),
@@ -23,7 +23,7 @@ export function useClerkFetch() {
 
     if (!res.ok) {
       const text = await res.text().catch(() => "");
-      console.error("❌ API error:", res.status, url, text);
+      console.error("❌ ClerkFetch Error:", res.status, url, text);
       throw new Error(`Request failed (${res.status}): ${text || res.statusText}`);
     }
 

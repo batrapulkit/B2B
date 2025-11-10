@@ -488,4 +488,8 @@ export class SupabaseStorage implements IStorage {
   }
 }
 
-export const storage = new SupabaseStorage();
+import { MockStorage } from "./mockStorage";
+const USE_MOCK = process.env.MOCK_MODE === "true";
+export const storage = USE_MOCK ? new MockStorage() : new SupabaseStorage();
+
+

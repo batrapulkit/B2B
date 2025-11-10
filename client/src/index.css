@@ -286,3 +286,91 @@
     inset: -1px;
   }
 }
+
+/* === GLOBAL DASHBOARD LAYOUT FIX === */
+
+/* Make sure root fills screen and hides scrollbars */
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden; /* no browser scrollbars */
+}
+
+/* Dashboard app container */
+.app-root {
+  height: 100vh;
+  width: 100vw;
+  display: flex;
+  background-color: hsl(var(--background));
+  overflow: hidden;
+}
+
+/* Sidebar: fixed width, flush left */
+.app-sidebar {
+  flex: 0 0 17rem; /* ~272px */
+  height: 100%;
+  background-color: hsl(var(--sidebar));
+  border-right: 1px solid hsl(var(--border));
+  overflow: hidden;
+}
+
+/* Main section: fills remaining space */
+.app-main {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-width: 0; /* prevents weird horizontal overflow */
+  overflow: hidden;
+}
+
+/* Header: fixed height, stays on top */
+.app-header {
+  flex-shrink: 0;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: hsl(var(--card));
+  border-bottom: 1px solid hsl(var(--border));
+  padding: 0 1.25rem;
+}
+
+/* Main dashboard content */
+.app-content {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* no outer scroll */
+  height: calc(100vh - 64px); /* header height offset */
+}
+
+/* Panels that need internal scroll (e.g., table, activity feed) */
+.panel-scroll {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -ms-overflow-style: none;  /* IE */
+  scrollbar-width: none;     /* Firefox */
+}
+.panel-scroll::-webkit-scrollbar {
+  display: none;             /* Chrome/Safari */
+}
+
+/* Remove scrollbars globally inside child flex areas */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Make sure everything inside fits fluidly */
+* {
+  min-width: 0;
+  min-height: 0;
+  box-sizing: border-box;
+}
