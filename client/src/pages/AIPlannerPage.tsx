@@ -1,4 +1,5 @@
-import { AIChatInterface } from "@/components/AIChatInterface";
+import AIChatInterface from "@/components/AIChatInterface";
+
 
 export default function AIPlannerPage() {
   return (

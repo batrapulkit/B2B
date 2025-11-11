@@ -39,28 +39,26 @@ export function AppSidebar() {
   const { user } = useAuth();
 
   return (
-    <Sidebar className="!p-0 !m-0 border-r border-sidebar-border bg-sidebar w-[17rem]">
+    <Sidebar className="w-[260px] flex flex-col bg-white text-sidebar-foreground h-screen">
       {/* Header */}
-      <SidebarHeader className="px-4 py-5 border-b border-sidebar-border">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-primary to-pink-600 rounded-xl flex items-center justify-center">
-            <Plane className="w-6 h-6 text-white" />
-          </div>
-          <div>
-            <h1 className="text-xl font-heading font-bold text-sidebar-foreground">
-              Triponic
-            </h1>
-            <p className="text-xs text-muted-foreground">Enterprise Platform</p>
-          </div>
+      <SidebarHeader className="px-5 py-5 border-b border-gray-200 flex items-center gap-3">
+        <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-pink-600 rounded-xl flex items-center justify-center">
+          <Plane className="w-6 h-6 text-white" />
+        </div>
+        <div>
+          <h1 className="text-lg font-bold">Triponic</h1>
+          <p className="text-xs text-gray-500">Enterprise Platform</p>
         </div>
       </SidebarHeader>
 
       {/* Menu */}
-      <SidebarContent className="px-3">
+      <SidebarContent className="flex-1 overflow-y-auto no-scrollbar px-3 py-4">
         <SidebarGroup>
-          <SidebarGroupLabel>Main Menu</SidebarGroupLabel>
+          <SidebarGroupLabel className="text-xs uppercase tracking-wide text-gray-500 mb-2">
+            Main Menu
+          </SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu>
+            <SidebarMenu className="flex flex-col gap-1">
               {menuItems.map((item) => {
                 const Icon = item.icon;
                 const isActive =
@@ -72,11 +70,11 @@ export function AppSidebar() {
                     <SidebarMenuButton asChild>
                       <Link href={item.url}>
                         <div
-                          className={`flex items-center gap-3 px-4 py-2 rounded-md cursor-pointer transition
+                          className={`flex items-center gap-3 px-4 py-2.5 rounded-md text-sm font-medium cursor-pointer transition
                             ${
                               isActive
-                                ? "bg-primary text-white"
-                                : "hover:bg-muted text-muted-foreground"
+                                ? "bg-indigo-600 text-white shadow-sm"
+                                : "text-gray-700 hover:bg-gray-100"
                             }`}
                         >
                           <Icon className="w-4 h-4" />
@@ -93,24 +91,25 @@ export function AppSidebar() {
       </SidebarContent>
 
       {/* Footer */}
-      <SidebarFooter className="p-4 border-t border-sidebar-border">
-        <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/40 transition">
+      <SidebarFooter className="p-4 border-t border-gray-200 bg-white">
+        <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-100 transition">
           <Avatar className="w-10 h-10">
             <AvatarImage src={user?.imageUrl || ""} />
-            <AvatarFallback className="bg-primary text-primary-foreground">
+            <AvatarFallback className="bg-indigo-600 text-white font-semibold">
               {user?.firstName?.[0] || "U"}
               {user?.lastName?.[0] || ""}
             </AvatarFallback>
           </Avatar>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-sidebar-foreground truncate">
+            <p className="text-sm font-medium truncate">
               {user?.fullName || user?.email || "User"}
             </p>
-            <div className="flex items-center gap-2">
-              <Badge variant="secondary" className="text-xs">
-                Agent
-              </Badge>
-            </div>
+            <Badge
+              variant="secondary"
+              className="text-xs bg-indigo-50 text-indigo-700"
+            >
+              Agent
+            </Badge>
           </div>
         </div>
       </SidebarFooter>
